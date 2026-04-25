@@ -1,0 +1,84 @@
+repos:
+  # General file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer # Ensures files end with a newline
+      - id: trailing-whitespace # Strips trailing whitespace
+      - id: check-merge-conflict # Blocks files with merge conflict markers
+      - id: check-yaml # Validates YAML syntax
+      - id: check-json # Validates JSON syntax
+      - id: detect-private-key # Prevents accidental private key commits
+      - id: mixed-line-ending # Normalises line endings
+        args: [--fix=lf]
+      - id: check-added-large-files # Blocks commits of unusually large files
+        args: [--maxkb=512] # 500 KB — tune per repo if legit need
+
+  # Secret scanning — broader than detect-private-key (AWS keys, GitHub PATs,
+  # Slack webhooks, etc.). Built-in ruleset; no config file required.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # JavaScript / TypeScript linting. Requires a per-repo ESLint config
+  # (`eslint.config.mjs` or legacy `.eslintrc*`). Hook is a no-op in repos
+  # with no matching files. Add plugins via `additional_dependencies` in a
+  # per-repo override if needed.
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v10.2.1
+    hooks:
+      - id: eslint
+        files: \.[jt]sx?$|\.mjs$|\.cjs$
+        types: [file]
+
+  # Prettier — same repo-discovers-config model. Skips repos without a
+  # Prettier config (`.prettierrc*` / `prettier` key in package.json).
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.8.3
+    hooks:
+      - id: prettier
+        files: \.(js|jsx|mjs|cjs|ts|tsx|json|yaml|yml|md|css|scss|html)$
+
+  # Terraform-specific hooks
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.105.0
+    hooks:
+      - id: terraform_fmt # Runs `terraform fmt`
+      - id: terraform_validate # Runs `terraform validate`
+        args:
+          - --args=-no-color
+      - id: terraform_docs # Auto-generates README docs from variables/outputs
+        args:
+          - --args=--output-file README.md
+          - --args=--output-mode inject
+      - id: terraform_tflint # Lints for common errors and best practices
+        args:
+          - --args=--only=terraform_deprecated_interpolation
+          - --args=--only=terraform_deprecated_index
+          - --args=--only=terraform_unused_declarations
+          - --args=--only=terraform_comment_syntax
+          - --args=--only=terraform_documented_outputs
+          - --args=--only=terraform_documented_variables
+          - --args=--only=terraform_typed_variables
+          - --args=--only=terraform_module_pinned_source
+          - --args=--only=terraform_naming_convention
+      - id: terraform_checkov # Static analysis / security scanning
+        args:
+          - --args=--quiet
+          - --args=--compact
+
+  # GitHub Actions workflow linting. Catches expression errors, deprecated
+  # action majors, and shellcheck-style issues inside `run:` blocks.
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  # Dependency vulnerability scanning. Reads lockfiles (package-lock.json,
+  # go.sum, Cargo.lock, requirements.txt, etc.) against the OSV database.
+  - repo: https://github.com/google/osv-scanner
+    rev: v2.3.5
+    hooks:
+      - id: osv-scanner
+        args: ["-r", "."]

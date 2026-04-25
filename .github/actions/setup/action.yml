@@ -1,0 +1,28 @@
+name: Set up dotfiles
+description: Install canonical dotfiles into $HOME on the runner.
+inputs:
+  ref:
+    description: Git ref of alanreidphotography/dotfiles to install. Default 'main' is fine for now; pin to a SHA or tag for reproducibility.
+    required: false
+    default: main
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v6.0.2
+      with:
+        repository: alanreidphotography/dotfiles
+        ref: ${{ inputs.ref }}
+        path: .dotfiles-runtime
+    - name: Install canonical configs to $HOME
+      shell: bash
+      run: |
+        set -euo pipefail
+        for f in .pre-commit-config.yaml .prettierrc.json eslint.config.mjs; do
+          src=".dotfiles-runtime/home/$f"
+          dst="$HOME/$f"
+          if [[ -f "$dst" ]] && cmp -s "$src" "$dst"; then continue; fi
+          install -m 0644 "$src" "$dst"
+        done
+    - name: Cleanup
+      shell: bash
+      run: rm -rf .dotfiles-runtime
