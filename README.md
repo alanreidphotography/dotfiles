@@ -1,13 +1,21 @@
 # dotfiles
 
-Canonical home for three tool configs that need to live identically on dev
-machines and on GitHub-hosted CI runners:
+Canonical home for files that need to live identically across dev
+machines (and, for the tool configs, on GitHub-hosted CI runners).
+
+Tool configs — installed on both dev machines and CI:
 
 | File                      | Used by                  |
 | ------------------------- | ------------------------ |
 | `.pre-commit-config.yaml` | `pre-commit`             |
 | `.prettierrc.json`        | Prettier                 |
 | `eslint.config.mjs`       | ESLint (zero-dependency) |
+
+Dev-only files — installed on dev machines, ignored by CI:
+
+| File                            | Used by                             |
+| ------------------------------- | ----------------------------------- |
+| `.claude/scripts/cc-cleanup.sh` | Claude Code session-startup cleanup |
 
 The originals lived in `$HOME` and were symlinked into each repo. That
 worked locally but broke on GitHub-hosted runners (their `$HOME` isn't
@@ -38,10 +46,13 @@ Add this step before any tool that reads one of the canonical configs
 - uses: alanreidphotography/dotfiles/.github/actions/setup@v1.0.0
 ```
 
-The action checks out this repo into a scratch directory and copies
-`home/*` into `$HOME` on the runner. Plain copies, not symlinks —
-runners are ephemeral, so simplicity beats drift-prevention. Pin to a
-tag or SHA in production workflows; `main` is allowed but discouraged.
+The action checks out this repo into a scratch directory and installs
+the three tool configs above into `$HOME` on the runner. The list is
+hardcoded in [`action.yml`](.github/actions/setup/action.yml) — dev-only
+files under `home/` (e.g. `.claude/scripts/cc-cleanup.sh`) are skipped.
+Plain copies, not symlinks — runners are ephemeral, so simplicity beats
+drift-prevention. Pin to a tag or SHA in production workflows; `main` is
+allowed but discouraged.
 
 ## Update workflow
 
