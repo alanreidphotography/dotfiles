@@ -68,6 +68,25 @@ repos:
           - --args=--quiet
           - --args=--compact
 
+  # Rust formatting. Discovers every `Cargo.toml` in the repo and runs
+  # `cargo fmt --check` against each workspace, so the hook works
+  # whether the manifest sits at the repo root or in a subdir (e.g.
+  # Tauri's `src-tauri/`). `language: system` uses the user's locally
+  # installed toolchain rather than letting pre-commit manage one.
+  # No-op in repos with no `.rs` files. The exclusions skip
+  # build artefacts and Claude Code's `.claude/worktrees/<name>/`,
+  # which would otherwise re-scan the same workspace from inside a
+  # worktree session and double-fail the same diagnostics.
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt --check
+        description: Run rustfmt across every Cargo workspace under the repo
+        entry: bash -c 'set -e; for m in $(find . -name Cargo.toml -not -path "*/target/*" -not -path "*/node_modules/*" -not -path "*/.claude/*"); do cargo fmt --manifest-path "$m" --all -- --check; done'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+
   # GitHub Actions workflow linting. Catches expression errors, deprecated
   # action majors, and shellcheck-style issues inside `run:` blocks.
   - repo: https://github.com/rhysd/actionlint
