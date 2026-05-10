@@ -3,7 +3,13 @@
 # Re-run any time after a `git pull` here — no-op if nothing changed.
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-for f in .pre-commit-config.yaml .prettierrc.json eslint.config.mjs; do
+FILES=(
+  .pre-commit-config.yaml
+  .prettierrc.json
+  eslint.config.mjs
+  .claude/scripts/cc-cleanup.sh
+)
+for f in "${FILES[@]}"; do
   src="$DIR/home/$f"
   dst="$HOME/$f"
   if [[ -L "$dst" && "$(readlink "$dst")" == "$src" ]]; then
@@ -15,6 +21,7 @@ for f in .pre-commit-config.yaml .prettierrc.json eslint.config.mjs; do
     echo "save  $dst -> $backup"
     mv "$dst" "$backup"
   fi
+  mkdir -p "$(dirname "$dst")"
   ln -sfn "$src" "$dst"
   echo "link  $dst -> $src"
 done

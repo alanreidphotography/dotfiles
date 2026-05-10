@@ -96,8 +96,11 @@ repos:
 
   # Dependency vulnerability scanning. Reads lockfiles (package-lock.json,
   # go.sum, Cargo.lock, requirements.txt, etc.) against the OSV database.
+  # `--allow-no-lockfiles` makes the hook a no-op in repos with no
+  # lockfiles to scan (config-only repos like this one) instead of
+  # exiting 128 — without it every commit needs SKIP=osv-scanner.
   - repo: https://github.com/google/osv-scanner
     rev: v2.3.5
     hooks:
       - id: osv-scanner
-        args: ["-r", "."]
+        args: ["-r", "--allow-no-lockfiles", "."]
