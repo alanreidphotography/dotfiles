@@ -140,12 +140,32 @@ is_squash_merged() {
   return 1
 }
 
+# Branches checked out by any worktree must never be deleted — even when
+# they're trivially ancestors of origin/<default> because the worktree
+# hasn't been committed to yet (a fresh worktree's tip == origin/main, so
+# `merge-base --is-ancestor` returns true and the classifier would
+# otherwise queue it for deletion). git itself refuses `branch -D` on a
+# live worktree checkout, but relying on that backstop alone is one git
+# release away from a destructive bug. Build the set up front and skip
+# in the classifier. Sentinel-string membership keeps this bash 3.2
+# compatible (macOS system bash); switch to `declare -A` if the script
+# ever requires bash 4+ for other reasons.
+WORKTREE_BRANCHES="|"
+while IFS= read -r line; do
+  case "$line" in
+    "branch refs/heads/"*)
+      WORKTREE_BRANCHES+="${line#branch refs/heads/}|"
+      ;;
+  esac
+done < <(git worktree list --porcelain)
+
 while IFS= read -r raw; do
   name="$(echo "$raw" | sed 's/^[* ] *//' | awk '{print $1}')"
   [ -z "$name" ] && continue
   [[ "$name" =~ $PROTECTED_RE ]] && continue
   [ "$name" = "$CURRENT_BRANCH" ] && continue
   [ "$name" = "$DEFAULT_BRANCH" ] && continue
+  case "$WORKTREE_BRANCHES" in *"|$name|"*) continue ;; esac
 
   if git merge-base --is-ancestor "$name" "$COMPARE_REF" 2>/dev/null; then
     SAFE_DELETE+=("$name|merged into $COMPARE_REF")
