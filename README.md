@@ -59,8 +59,21 @@ allowed but discouraged.
 1. Edit the relevant file under `home/`.
 2. Commit and push. Symlinked dev machines pick up the change on the
    next `git pull` inside `~/.dotfiles`.
-3. Bump the tag (`vX.Y.Z`) so consuming repos can opt in by bumping
-   their pinned ref.
+3. **Only if** the change touches a CI-consumed file
+   (`.pre-commit-config.yaml`, `.prettierrc.json`, `eslint.config.mjs`):
+   bump the tag (`vX.Y.Z`) so consuming repos can opt in by bumping
+   their pinned ref. Dev-only files under `home/` (e.g. anything in
+   `home/.claude/`) don't need a tag bump — dev machines just `git
+pull` and re-run `bin/install.sh` if a new symlink was added.
+
+   Pick the bump level by what changed:
+   - Patch (`v1.2.0` → `v1.2.1`): bug fix or non-behavioural tweak
+     in an existing config (e.g. fixing a regex, tightening a glob).
+   - Minor (`v1.2.0` → `v1.3.0`): additive — new hook, new rule, new
+     plugin entry. Consumers picking it up shouldn't see regressions.
+   - Major (`v1.2.0` → `v2.0.0`): breaking — removed a rule, changed
+     a default that downstream repos may have been relying on, or
+     changed `action.yml`'s inputs/outputs.
 
 ## Conventions
 
