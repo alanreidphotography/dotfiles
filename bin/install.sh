@@ -8,6 +8,7 @@ FILES=(
   .prettierrc.json
   eslint.config.mjs
   .claude/scripts/cc-cleanup.sh
+  .claude/hooks/session-start.sh
 )
 for f in "${FILES[@]}"; do
   src="$DIR/home/$f"
