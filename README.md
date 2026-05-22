@@ -13,9 +13,11 @@ Tool configs — installed on both dev machines and CI:
 
 Dev-only files — installed on dev machines, ignored by CI:
 
-| File                            | Used by                             |
-| ------------------------------- | ----------------------------------- |
-| `.claude/scripts/cc-cleanup.sh` | Claude Code session-startup cleanup |
+| File                                   | Used by                             |
+| -------------------------------------- | ----------------------------------- |
+| `.claude/scripts/cc-cleanup.sh`        | Claude Code session-startup cleanup |
+| `.claude/hooks/session-start.sh`       | Claude Code SessionStart hook       |
+| `.claude/hooks/deny-protected-push.sh` | Claude Code PreToolUse push guard   |
 
 The originals lived in `$HOME` and were symlinked into each repo. That
 worked locally but broke on GitHub-hosted runners (their `$HOME` isn't
