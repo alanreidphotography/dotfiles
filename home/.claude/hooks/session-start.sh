@@ -153,7 +153,9 @@ if [[ -f "$CLEANUP_SCRIPT" ]]; then
   # Surface "Failed to delete" lines verbatim — these are signal per CLAUDE.md.
   if echo "$cleanup_out" | grep -q "Failed to delete"; then
     warn "Cleanup had branch deletion failures:"
-    echo "$cleanup_out" | awk '/Failed to delete:/{f=1; next} f && /^    -/ {print "    "$0}' | while IFS= read -r l; do log "$l"; done
+    while IFS= read -r l; do
+      log "$l"
+    done < <(echo "$cleanup_out" | awk '/Failed to delete:/{f=1; next} f && /^    -/ {print "    "$0}')
   fi
   # Surface "Skipping (could not verify..." section so unmerged-but-stale
   # branches don't quietly accumulate.
@@ -174,7 +176,9 @@ if [[ -f "$CLEANUP_SCRIPT" ]]; then
   fi
   if [[ "$cleanup_rc" -ne 0 ]]; then
     warn "cc-cleanup.sh exited with code $cleanup_rc; tail:"
-    echo "$cleanup_out" | tail -5 | while IFS= read -r l; do log "    $l"; done
+    while IFS= read -r l; do
+      log "    $l"
+    done < <(echo "$cleanup_out" | tail -5)
   fi
 else
   warn "Cleanup script not found at $CLEANUP_SCRIPT — skipping branch cleanup."
@@ -236,8 +240,9 @@ else
         git rebase --abort >/dev/null 2>&1 || true
         sync_result="aborted (conflict with origin/$DEFAULT_BRANCH — rebase manually)"
         warn "Rebase aborted due to conflict. Conflicting paths (best-effort):"
-        echo "$rebase_out" | grep -E "^(CONFLICT|both modified:|deleted by us:|deleted by them:)" \
-          | head -10 | while IFS= read -r l; do log "    $l"; done
+        while IFS= read -r l; do
+          log "    $l"
+        done < <(echo "$rebase_out" | grep -E "^(CONFLICT|both modified:|deleted by us:|deleted by them:)" | head -10)
       fi
     fi
   fi
@@ -427,7 +432,9 @@ if [[ "$pr_url" =~ https://github.com/[^[:space:]]+/pull/[0-9]+ ]]; then
   warn "Opened autofix PR — please review: ${BASH_REMATCH[0]}"
 else
   warn "Push succeeded but PR creation output was unexpected:"
-  echo "$pr_url" | tail -5 | while IFS= read -r l; do log "    $l"; done
+  while IFS= read -r l; do
+    log "    $l"
+  done < <(echo "$pr_url" | tail -5)
 fi
 
 exit 0
