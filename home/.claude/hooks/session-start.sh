@@ -139,6 +139,18 @@ if [[ -f "$CLEANUP_SCRIPT" ]]; then
   if echo "$cleanup_out" | grep -q "could not verify"; then
     note "Unverified branches left in place (run \`cc-cleanup.sh --dry-run\` to see them)."
   fi
+  # A transient fetch failure inside cc-cleanup is non-fatal there (it warns,
+  # continues with stale refs, and still exits 0). Surface it here so the
+  # failure isn't swallowed and the stale-refs caveat for the rebase in step 2
+  # is visible.
+  if echo "$cleanup_out" | grep -q "WARNING: 'git fetch"; then
+    warn "Branch-cleanup fetch failed — origin/$DEFAULT_BRANCH may be stale; the rebase below could no-op or use an old tip."
+    # Process substitution (not a pipe) so the loop runs in this shell and the
+    # appended detail lines survive — a piped `while` would log into a subshell.
+    while IFS= read -r l; do
+      log "    $l"
+    done < <(echo "$cleanup_out" | sed -n "/WARNING: 'git fetch/,/^[[:space:]]*\$/p" | sed -n 's/^    //p' | head -5)
+  fi
   if [[ "$cleanup_rc" -ne 0 ]]; then
     warn "cc-cleanup.sh exited with code $cleanup_rc; tail:"
     echo "$cleanup_out" | tail -5 | while IFS= read -r l; do log "    $l"; done
@@ -151,8 +163,12 @@ log ""
 # ---------------------------------------------------------------------------
 # 2. Sync with origin/main.
 #
-# cc-cleanup.sh already ran `git fetch --all --prune`, so origin/main is
-# fresh as of step 1. No need to refetch here.
+# cc-cleanup.sh already ran `git fetch --all --prune` in step 1, so
+# origin/<default> is normally fresh and we don't refetch here. That fetch
+# is best-effort, though: on a transient failure cc-cleanup warns and
+# continues (still exiting 0), and step 1 above surfaces that warning. When
+# it fires, the refs below may be stale, so this rebase can no-op or rebase
+# onto an older tip — both self-correct on the next successful session start.
 # ---------------------------------------------------------------------------
 log "[2/4] Sync with origin/$DEFAULT_BRANCH"
 

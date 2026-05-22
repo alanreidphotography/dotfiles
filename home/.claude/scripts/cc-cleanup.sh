@@ -19,6 +19,15 @@
 #   - Anything we can't verify is left alone and reported.
 #   - Protected branches and the current branch are never touched.
 #
+# Network: the initial `git fetch --all --prune` is best-effort. On a
+# transient remote/network/SSH failure it does NOT abort the run under
+# `set -e` (which would otherwise surface, via the SessionStart hook, as a
+# bare non-zero exit with an empty diagnostic tail). Instead the script
+# warns loudly — including git's own stderr — and continues against the
+# existing remote-tracking refs. Classification may then be slightly stale
+# (it errs toward leaving branches alone), and the script still exits 0 so
+# the hook can surface the warning rather than a scary failure code.
+#
 # Usage:
 #   bash cc-cleanup.sh             # interactive
 #   bash cc-cleanup.sh --yes       # skip confirmation
@@ -63,12 +72,22 @@ echo "==> Current branch: $CURRENT_BRANCH"
 echo "==> gh CLI:         $([ $HAS_GH -eq 1 ] && echo yes || echo no)"
 echo
 
-# 1. Refresh state.
+# 1. Refresh state. Best-effort: capture the fetch's exit code instead of
+# letting `set -e` kill the run on a transient failure. On failure we warn
+# with git's own stderr and continue against the existing remote-tracking
+# refs (see the Network note in the header).
 echo "==> Fetching and pruning remote refs..."
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "    (dry-run) would run: git fetch --all --prune"
 else
-  git fetch --all --prune --quiet
+  fetch_out="$(git fetch --all --prune --quiet 2>&1)" || fetch_rc=$?
+  fetch_rc="${fetch_rc:-0}"
+  if [ "$fetch_rc" -ne 0 ]; then
+    echo "==> WARNING: 'git fetch --all --prune' failed (exit $fetch_rc) — continuing with existing remote-tracking refs; branch classification may be stale." >&2
+    if [ -n "$fetch_out" ]; then
+      printf '%s\n' "$fetch_out" | while IFS= read -r l; do echo "    $l" >&2; done
+    fi
+  fi
 fi
 echo
 
