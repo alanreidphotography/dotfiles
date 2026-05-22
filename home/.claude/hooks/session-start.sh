@@ -17,6 +17,11 @@
 #                                  PR when safe — main checkout clean and
 #                                  on default branch, gh authed)
 #
+# Before those steps, an installed-clone guard warns when the session is
+# running inside ~/.dotfiles (the symlinked-into-$HOME clone), which must
+# only ever track the default branch — branching/committing there is the
+# mistake the guard exists to catch.
+#
 # Exit codes:
 #   0  — always (we never want to block session startup over startup work;
 #        problems are surfaced through additionalContext instead).
@@ -107,6 +112,22 @@ DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
 log "Session-start hook: $REPO_ROOT"
 log "Branch: $CURRENT_BRANCH$([[ $IN_WORKTREE -eq 1 ]] && echo " (worktree)" || true) · default: $DEFAULT_BRANCH"
 log ""
+
+# ---------------------------------------------------------------------------
+# Installed-clone guard.
+#
+# ~/.dotfiles is the *installed* clone: bin/install.sh symlinks its files
+# into $HOME, and live tooling (this hook, cc-cleanup.sh, the shared tool
+# configs) is consumed from it. It must only ever track the default branch
+# and update via pull; feature work belongs in a separate dev checkout. A
+# session that branches or commits here leaves the clone parked off-default
+# with the live tooling running un-merged code — exactly how this guard came
+# to exist. Warn loudly; the sync step below still runs.
+# ---------------------------------------------------------------------------
+if [[ "$(abs "$REPO_ROOT")" == "$(abs "$HOME/.dotfiles")" ]]; then
+  warn "This is the INSTALLED clone (~/.dotfiles); its files are symlinked into \$HOME and run live. It must only ever track $DEFAULT_BRANCH — do NOT create branches or commit here. Make changes in a separate dev checkout and let this clone update via pull."
+  log ""
+fi
 
 # ---------------------------------------------------------------------------
 # 1. Branch cleanup.
