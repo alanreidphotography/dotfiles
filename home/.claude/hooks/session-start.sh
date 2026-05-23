@@ -11,8 +11,11 @@
 #   2. Sync with origin/main      (rebase on a feature/worktree branch,
 #                                  fast-forward on main itself, skip on
 #                                  detached HEAD or non-main bases)
-#   3. Symlink check              (.pre-commit-config.yaml always, eslint
-#                                  + prettier configs if JS/TS repo)
+#   3. Symlink check              (.pre-commit-config.yaml always; eslint
+#                                  + prettier configs in a JS/TS repo, but
+#                                  only when the repo doesn't already ship
+#                                  its own config under one of the many
+#                                  filenames those tools resolve)
 #   4. Worktree gitignore audit   (warn always; offer autofix via dedicated
 #                                  PR when safe — main checkout clean and
 #                                  on default branch, gh authed)
@@ -309,9 +312,62 @@ if [[ -f "$REPO_ROOT/package.json" ]]; then
 elif find "$REPO_ROOT" -maxdepth 3 -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.jsx' \) -not -path '*/node_modules/*' -not -path '*/.claude/*' -print -quit 2>/dev/null | grep -q .; then
   JS_TS_REPO=1
 fi
+# ESLint and Prettier each resolve their config from a long list of
+# filenames. ensure_symlink only guards the exact canonical destination
+# ("eslint.config.mjs" / ".prettierrc.json"), so a repo whose config lives
+# under any other name would still get a competing symlink dropped on it —
+# and that symlink can even take precedence (ESLint resolves eslint.config
+# .cjs/.ts/.mts/.cts after .mjs; Prettier resolves .prettierrc.js and
+# prettier.config.* after .prettierrc.json). Skip the symlink whenever the
+# repo already ships its own config under a different name. $1 is the
+# canonical name (left to ensure_symlink); the rest are the other names the
+# tool resolves.
+repo_provides_config() {
+  local canonical="$1"; shift
+  local name
+  for name in "$@"; do
+    [[ "$name" == "$canonical" ]] && continue
+    [[ -e "$REPO_ROOT/$name" ]] && return 0
+  done
+  return 1
+}
+
+# Prettier also reads a top-level "prettier" key in package.json. Parse it —
+# a bare grep would false-positive on the "prettier" devDependency.
+package_json_has_prettier_key() {
+  [[ -f "$REPO_ROOT/package.json" ]] || return 1
+  python3 - "$REPO_ROOT/package.json" <<'PY' 2>/dev/null
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(1)
+sys.exit(0 if isinstance(data, dict) and "prettier" in data else 1)
+PY
+}
+
 if [[ "$JS_TS_REPO" -eq 1 ]]; then
-  ensure_symlink "eslint.config.mjs" "$HOME/eslint.config.mjs" || true
-  ensure_symlink ".prettierrc.json"  "$HOME/.prettierrc.json"  || true
+  if repo_provides_config "eslint.config.mjs" \
+      eslint.config.js eslint.config.mjs eslint.config.cjs \
+      eslint.config.ts eslint.config.mts eslint.config.cts \
+      .eslintrc .eslintrc.js .eslintrc.cjs .eslintrc.json \
+      .eslintrc.yml .eslintrc.yaml; then
+    note "Repo ships its own ESLint config — not symlinking eslint.config.mjs."
+  else
+    ensure_symlink "eslint.config.mjs" "$HOME/eslint.config.mjs" || true
+  fi
+
+  if repo_provides_config ".prettierrc.json" \
+      .prettierrc .prettierrc.json .prettierrc.yaml .prettierrc.yml \
+      .prettierrc.json5 .prettierrc.toml .prettierrc.js .prettierrc.cjs \
+      .prettierrc.mjs .prettierrc.ts .prettierrc.cts .prettierrc.mts \
+      prettier.config.js prettier.config.cjs prettier.config.mjs \
+      prettier.config.ts prettier.config.cts prettier.config.mts \
+     || package_json_has_prettier_key; then
+    note "Repo ships its own Prettier config — not symlinking .prettierrc.json."
+  else
+    ensure_symlink ".prettierrc.json" "$HOME/.prettierrc.json" || true
+  fi
 fi
 
 # Pre-commit install decision (per CLAUDE.md rules).
